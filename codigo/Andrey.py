@@ -1,4 +1,4 @@
-# %% Importación de paquetes ============================
+# %% Importacion de paquetes ============================
 
 # Trabajar con rutas relativas en python
 from pathlib import Path
@@ -23,7 +23,7 @@ DATA_DIR = BASE_DIR / "datos"
 ruta_ipi = DATA_DIR / "anex_IPI_ago2026.xlsx"
 
 
-# %% volverlo data frame/ Cargar el archivo CSV
+# %% volverlo data frame/ Cargar el archivo EXEL
 ipi_raw = pd.read_excel(ruta_ipi, sheet_name=3, header=8)
 print(ipi_raw.head())
 
@@ -37,15 +37,42 @@ df_ipi = ipi_raw[
 ].copy()
 print(df_ipi.tail())
 
-# %% Creación del índice temporal
-fechas_expo_base = pd.date_range(start="1990-01-01", periods=len(expo_base), freq="MS")
+# %% unir mes y año en una sola columna
+meses = {
+    "enero": 1,
+    "febrero": 2,
+    "marzo": 3,
+    "abril": 4,
+    "mayo": 5,
+    "junio": 6,
+    "julio": 7,
+    "agosto": 8,
+    "septiembre": 9,
+    "octubre": 10,
+    "noviembre": 11,
+    "diciembre": 12,
+}
+mes = pd.to_numeric(df_ipi["Mes"], errors="coerce")
+mes = mes.fillna(
+    df_ipi["Mes"].astype(str).str.strip().str.lower().map(meses)
+)
+df_ipi["Fecha"] = pd.to_datetime(
+    {"year": df_ipi["Año"], "month": mes, "day": 1}, errors="coerce"
+)
+# %%
+print(df_ipi.head())
 
-# Agregar el índice temporal a la base de datos de exportaciones tradicionales
-expo_base.index = fechas_expo_base
+# %% Paso 1: Identificación
+# ============================
 
-# El tipo de objeto de la base de datos sigue siendo Pandas.DataFrame
-print(type(expo_base))
-
-# Ver primeras y últimas observaciones de la base de datos, ahora con índice temporal
-print(expo_base.head())  # Primeras observaciones
-print(expo_base.tail())  # Últimas observaciones
+# Gráfica de la serie de tiempo "índice de producción industrial"
+plt.figure(figsize=(10, 5))
+plt.plot(
+    df_ipi["Fecha"], df_ipi["Producción real"], marker="o", linestyle="-"
+)  # llamo la base y escogo con [] la columna. "0" pone el punto, "-" pone la linea continua
+plt.title("Índice de Producción Industrial, 2014-2026")
+plt.xlabel("Año ")
+plt.ylabel("Valor")
+plt.grid(True)
+plt.show()
+# %%
