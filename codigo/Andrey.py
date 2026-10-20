@@ -189,23 +189,22 @@ modelo_a = SARIMAX(
     ipi_log,
     order=(1, 1, 0),  # p=1, d=1, q=0
     seasonal_order=(0, 1, 1, 12),  # P=0, D=1, Q=1, s=12 (estacionalidad anual)
-    trend="c",  # incluir constante en el modelo
 )
 resultado_a = modelo_a.fit(
     disp=False
-)  # fit ajusta el modelo y disp evita que se muestren iteraciones en la consola
+)  # fit ajusta el modelo por Máxima Verosimilitud y disp evita que se muestren iteraciones en la consola
 print("--- MODELO CANDIDATO A ---")
 print(resultado_a.summary())
 print(
     f"AIC: {resultado_a.aic:.4f} | BIC: {resultado_a.bic:.4f}\n"
 )  # extrae aic y bic del modelo ajustado y los imprime con 4 decimales, n es un salto de linea
 
+
 # Candidato B (0,1,1)(0,1,1)12
 modelo_b = SARIMAX(
     ipi_log,
     order=(0, 1, 1),  # p=0, d=1, q=1
     seasonal_order=(0, 1, 1, 12),
-    trend="c",
 )
 resultado_b = modelo_b.fit(disp=False)
 print("--- MODELO CANDIDATO B ---")
@@ -221,4 +220,61 @@ if resultado_a.bic < resultado_b.bic:
 else:
     print("El modelo candidato B tiene un mejor ajuste según BIC.")
     # El modelo candidato B tiene un mejor ajuste segun aic y bic
+
+
+# %%
+# 2 estimacion del modelo final (0,1,1)(0,1,1)12
+
+print("Estimacion del modelo final SARIMA(0,1,1)(0,1,1)12... con dummy")
+
+
+# para los residuales hay un dato atipico en 2020 por lo que añadiremos una dummy
+dummy = pd.DataFrame(
+    0, index=ipi_log.index, columns=["covid"]
+)  # creo un dataframe de ceros con las fehcas de ipi_log
+dummy.loc["2020-03-01":"2020-6-01", "covid"] = 1
+
+modelo_b = SARIMAX(ipi_log, exog=dummy, order=(0, 1, 1), seasonal_order=(0, 1, 1, 12))
+resultado_b = modelo_b.fit(disp=False)
+print(resultado_b.summary())
+
+
+# %%
+# Paso 3: Validación de supuestos
+
+
+# Residuales del modelo
+# con d=1 D=1 el modelo pierda las primeras d + D*s observaciones para inicializarse osea 13
+residuales = resultado_b.resid.iloc[13:].dropna()
+
+
+# Gráfica de los residuales (deberían comportarse como ruido blanco)
+# con d=1 D=1 el modelo pierda las primeras d + D*s observaciones para inicializarse osea 13
+plt.figure(figsize=(10, 5))
+plt.plot(residuales)
+plt.title("Residuales del modelo SARIMA(0,1,1)(0,1,1)12")
+plt.xlabel("Fecha")
+plt.ylabel("Valor")
+plt.grid(True)
+plt.show()
+
+# Descripción de los residuales
+print(residuales.describe())
+# la dummy no pudo ajustar los residuales
+
+# %% FAC y FACP de los residuales
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+plot_acf(residuales, lags=34, alpha=0.05, bartlett_confint=False, ax=axes[0])
+
+axes[0].set_title("FAC de los residuales")
+
+plot_pacf(residuales, lags=34, alpha=0.05, ax=axes[1])
+
+axes[1].set_title("FACP de los residuales")
+
+plt.tight_layout()
+plt.show()
+
 # %%
