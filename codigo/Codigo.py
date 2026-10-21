@@ -223,17 +223,17 @@ else:
 
 
 # %%
-# 2 estimacion del modelo final (0,1,1)(0,1,1)12
+# paso dos 2 estimacion del modelo final (0,1,1)(0,1,1)12
 
 print("Estimacion del modelo final SARIMA(0,1,1)(0,0,1)12... con dummy")
 
 
 # para los residuales hay un dato atipico en 2020 por lo que añadiremos una dummy
-# la serie estaba sobre diferenciada, resultando en un ma.s.l12 y sigma2 no significativo por lo que se prono un D=0
+# la serie estaba sobre diferenciada, resultando en un ma.s.l12 y sigma2 no significativo por lo que se tomo un D=0
 dummy = pd.DataFrame(
     0, index=ipi_log.index, columns=["covid"]
 )  # creo un dataframe de ceros con las fehcas de ipi_log
-dummy.loc["2020-03-01":"2020-7-01", "covid"] = 1
+dummy.loc["2020-03-01":"2020-07-01", "covid"] = 1
 
 modelo_b = SARIMAX(ipi_log, exog=dummy, order=(0, 1, 1), seasonal_order=(0, 0, 1, 12))
 resultado_b = modelo_b.fit(disp=False)
@@ -290,7 +290,7 @@ print(ljung_box)
 
 # H0: no hay autocorrelación en los residuos.
 # Si p-value > 0.05, no se rechaza H0.
-
+# se cumple H0 para el resago 6 y 12
 
 # %% FAC y FACP de los residuales al cuadrado
 
@@ -347,14 +347,14 @@ print("Jarque-Bera p-value:", jb_test.pvalue)
 # La dummy covid vale 0 en el futuro
 fechas_futuras = pd.date_range(
     ipi_log.index[-1] + pd.offsets.MonthBegin(1), periods=12, freq="MS"
-)
+)  # -1 ultima fecha, pd.offsets.MonthBegin(1) para obtener el primer día del mes siguiente,
 exog_futuro = pd.DataFrame(0, index=fechas_futuras, columns=["covid"])
 
 
 # Protonóstico 12 pasos adelante
 pronostico_log = resultado_b.get_forecast(steps=12, exog=exog_futuro)
 
-# Pronóstico puntual e intervalos de predicción del logaritmo de las exportaciones tradicionales
+# Pronóstico puntual e intervalos de predicción del logaritmo de ipi
 pronostico_puntual_log = pronostico_log.predicted_mean
 varianza_pronostico_log = pronostico_log.var_pred_mean
 intervalos_log = pronostico_log.conf_int()
@@ -378,7 +378,7 @@ print(tabla_pronostico)
 # Gráfica del pronóstico
 plt.figure(figsize=(10, 5))
 plt.plot(ipi_serie, label="Datos históricos")
-plt.plot(pronostico_nivel, label="Pronóstico", color="orange")
+plt.plot(pronostico_nivel, label="Pronóstico", color="red")
 plt.fill_between(
     pronostico_nivel.index,
     intervalos_nivel.iloc[:, 0],
@@ -387,8 +387,9 @@ plt.fill_between(
     alpha=0.3,
     label="Intervalo de confianza",
 )
-
-# Note que para un MA(1), los pronósticos puntuales se vuelven
-# constantes después del primer paso adelante
+plt.title("Índice de Producción Industrial, 2014-2026")
+plt.xlabel("Año ")
+plt.ylabel("Valor")
+plt.show()
 
 # %%
