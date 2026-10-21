@@ -225,34 +225,37 @@ else:
 # %%
 # 2 estimacion del modelo final (0,1,1)(0,1,1)12
 
-print("Estimacion del modelo final SARIMA(0,1,1)(0,1,1)12... con dummy")
+print("Estimacion del modelo final SARIMA(0,1,1)(0,0,1)12... con dummy")
 
 
 # para los residuales hay un dato atipico en 2020 por lo que añadiremos una dummy
+# la serie estaba sobre diferenciada, resultando en un ma.s.l12 y sigma2 no significativo por lo que se prono un D=0
 dummy = pd.DataFrame(
     0, index=ipi_log.index, columns=["covid"]
 )  # creo un dataframe de ceros con las fehcas de ipi_log
-dummy.loc["2020-03-01":"2020-6-01", "covid"] = 1
+dummy.loc["2020-03-01":"2020-7-01", "covid"] = 1
 
-modelo_b = SARIMAX(ipi_log, exog=dummy, order=(0, 1, 1), seasonal_order=(0, 1, 1, 12))
+modelo_b = SARIMAX(ipi_log, exog=dummy, order=(0, 1, 1), seasonal_order=(0, 0, 1, 12))
 resultado_b = modelo_b.fit(disp=False)
 print(resultado_b.summary())
 
 
 # %%
 # Paso 3: Validación de supuestos
-
+# Prob(Q) = 0.57 (Ljung-Box): no se rechaza la hipótesis de no autocorrelación, así que los residuos se comportan como ruido blanco.
+# Prob(JB) = 0.00 (Jarque-Bera): se rechaza normalidad.
+# Prob(H) = 0.62heterocedasticidad): no se rechaza homocedasticidad.
 
 # Residuales del modelo
-# con d=1 D=1 el modelo pierda las primeras d + D*s observaciones para inicializarse osea 13
-residuales = resultado_b.resid.iloc[13:].dropna()
+#  el modelo pierda las primeras d + D*s observaciones para inicializarse osea 1
+residuales = resultado_b.resid.iloc[1:].dropna()
 
 
 # Gráfica de los residuales (deberían comportarse como ruido blanco)
-# con d=1 D=1 el modelo pierda las primeras d + D*s observaciones para inicializarse osea 13
+
 plt.figure(figsize=(10, 5))
 plt.plot(residuales)
-plt.title("Residuales del modelo SARIMA(0,1,1)(0,1,1)12")
+plt.title("Residuales del modelo SARIMA(0,1,1)(0,0,1)12")
 plt.xlabel("Fecha")
 plt.ylabel("Valor")
 plt.grid(True)
@@ -276,5 +279,116 @@ axes[1].set_title("FACP de los residuales")
 
 plt.tight_layout()
 plt.show()
+
+# en la fac: el modelo extrajo la estacionalidad anual, aun algunos rezagos se observa autocorrelacion, pero no es significativo
+# %% Prueba Ljung-Box
+
+ljung_box = acorr_ljungbox(residuales, lags=[6, 12, 18, 24, 30], return_df=True)
+
+print("Prueba Ljung-Box")
+print(ljung_box)
+
+# H0: no hay autocorrelación en los residuos.
+# Si p-value > 0.05, no se rechaza H0.
+
+
+# %% FAC y FACP de los residuales al cuadrado
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+plot_acf(residuales**2, lags=34, alpha=0.05, bartlett_confint=False, ax=axes[0])
+
+axes[0].set_title("FAC de los residuales al cuadrado")
+
+plot_pacf(residuales**2, lags=34, alpha=0.05, ax=axes[1])
+
+axes[1].set_title("FACP de los residuales al cuadrado")
+
+plt.tight_layout()
+plt.show()
+# fac residuales^2: sale solo en el periodo y 13
+
+
+# %% Prueba ARCH de heterocedasticidad
+
+arch_test = het_arch(residuales, nlags=12)
+
+print("Prueba ARCH")
+print("LM statistic:", arch_test[0])
+print("LM p-value:", arch_test[1])
+
+# H0: no hay efectos ARCH.
+# Si p-value > 0.05, no se rechaza H0.
+# homocedasticidad, no hay efectos ARCH
+
+# %% Q-Q plot de los residuos (normalidad)
+
+plt.figure(figsize=(6, 6))
+probplot(residuales.iloc[1:-1], dist="norm", plot=plt)
+plt.title("Q-Q plot de los residuos")
+plt.grid(True)
+plt.show()
+# segun Q-Q plot,son aproximadamente normales salvo por dos observaciones atípicas en la cola izquierda
+# %%Prueba de normalidad Jarque-Bera
+jb_test = jarque_bera(residuales.iloc[1:-1])
+
+print("Prueba Jarque-Bera")
+print("Jarque-Bera statistic:", jb_test.statistic)
+print("Jarque-Bera p-value:", jb_test.pvalue)
+
+# H0: los residuos no siguen una distribución normal.
+# Si p-value < 0.05, se rechaza H0.
+# el modelo rechaza normalidad
+
+
+# %% PASO 4: Pronóstico
+# A partir de la estimación del SARIMA (0, 1, 1) (0, 0, 1, 12) realizó el pronóstico
+
+# La dummy covid vale 0 en el futuro
+fechas_futuras = pd.date_range(
+    ipi_log.index[-1] + pd.offsets.MonthBegin(1), periods=12, freq="MS"
+)
+exog_futuro = pd.DataFrame(0, index=fechas_futuras, columns=["covid"])
+
+
+# Protonóstico 12 pasos adelante
+pronostico_log = resultado_b.get_forecast(steps=12, exog=exog_futuro)
+
+# Pronóstico puntual e intervalos de predicción del logaritmo de las exportaciones tradicionales
+pronostico_puntual_log = pronostico_log.predicted_mean
+varianza_pronostico_log = pronostico_log.var_pred_mean
+intervalos_log = pronostico_log.conf_int()
+
+# Al retransformar desde logaritmos, exp(E[log(y)]) corresponde a la mediana.
+# Para obtener la media en niveles se usa la corrección por sesgo:
+# E[y] = exp(mu + 0.5 * sigma^2), bajo normalidad en la escala logarítmica.
+pronostico_nivel = np.exp(pronostico_puntual_log + 0.5 * varianza_pronostico_log)
+intervalos_nivel = np.exp(intervalos_log)
+
+tabla_pronostico = pd.DataFrame(
+    {
+        "pronostico": pronostico_nivel,
+        "limite_inferior": intervalos_nivel.iloc[:, 0],
+        "limite_superior": intervalos_nivel.iloc[:, 1],
+    }
+)
+
+print(tabla_pronostico)
+
+# Gráfica del pronóstico
+plt.figure(figsize=(10, 5))
+plt.plot(ipi_serie, label="Datos históricos")
+plt.plot(pronostico_nivel, label="Pronóstico", color="orange")
+plt.fill_between(
+    pronostico_nivel.index,
+    intervalos_nivel.iloc[:, 0],
+    intervalos_nivel.iloc[:, 1],
+    color="orange",
+    alpha=0.3,
+    label="Intervalo de confianza",
+)
+
+# Note que para un MA(1), los pronósticos puntuales se vuelven
+# constantes después del primer paso adelante
 
 # %%
