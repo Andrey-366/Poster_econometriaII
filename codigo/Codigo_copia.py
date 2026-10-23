@@ -44,7 +44,7 @@ plt.figure(figsize=(10, 5))  # tamaño
 plt.plot(
     ipi_serie, marker="o", linestyle="-"
 )  # "0" pone el punto, "-" pone la linea continua
-plt.title("Índice de Producción Industrial, 2014-2026")
+plt.title("Índice de Producción Industrial, 2005-2025")
 plt.xlabel("Año ")
 plt.ylabel("Valor")
 plt.grid(True)
@@ -84,7 +84,6 @@ print("N° observaciones:", adf[3])
 print("Valores críticos:", adf[4])
 
 print()
-# Test KPSS
 
 
 print()
@@ -171,9 +170,9 @@ print(resultado_a.summary())
 
 # %%
 # Paso 3: Validación de supuestos
-# Prob(Q) = 0.78 (Ljung-Box): no se rechaza la hipótesis de no autocorrelación, así que los residuos se comportan como ruido blanco.
+# Prob(Q) = 0.68 (Ljung-Box): no se rechaza la hipótesis de no autocorrelación, así que los residuos se comportan como ruido blanco.
 # Prob(JB) = 0.00 (Jarque-Bera): se rechaza normalidad.
-# Prob(H) = 0.07>0.05 (heterocedasticidad): no se rechaza homocedasticidad.
+# Prob(H) = 0.02 (heterocedasticidad):  se rechaza homocedasticidad.
 
 # Residuales del modelo
 #  el modelo pierda las primeras d + D*s observaciones para inicializarse osea 1
@@ -184,7 +183,7 @@ residuales = resultado_a.resid.iloc[1:].dropna()
 
 plt.figure(figsize=(10, 5))
 plt.plot(residuales)
-plt.title("Residuales del modelo SARIMA(1,1,0)")
+plt.title("Residuales del modelo SARIMA(1,1,1)")
 plt.xlabel("Fecha")
 plt.ylabel("Valor")
 plt.grid(True)
@@ -225,17 +224,13 @@ print(ljung_box)
 
 # %% FAC y FACP de los residuales al cuadrado
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+fig = plt.subplots(1, 2, figsize=(14, 5))
 
 plot_acf(residuales**2, lags=50, alpha=0.05, bartlett_confint=False, ax=axes[0])
 
 axes[0].set_title("FAC de los residuales al cuadrado")
 
-plot_pacf(residuales**2, lags=50, alpha=0.05, ax=axes[1])
 
-axes[1].set_title("FACP de los residuales al cuadrado")
-
-plt.tight_layout()
 plt.show()
 # fac residuales^2: sale solo en el periodo y 13
 
@@ -312,7 +307,7 @@ plt.fill_between(
     alpha=0.3,
     label="Intervalo de confianza 95%",
 )
-plt.title("Índice de Producción Industrial, 2014-2026")
+plt.title("Índice de Producción Industrial, 2005-2025")
 plt.xlabel("Año")
 plt.ylabel("Índice de producción real")
 plt.legend()
