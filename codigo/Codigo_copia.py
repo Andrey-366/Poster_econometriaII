@@ -47,7 +47,7 @@ plt.plot(
 plt.title("Índice de Producción Industrial, 2005-2025")
 plt.xlabel("Año ")
 plt.ylabel("Valor")
-plt.grid(True)
+plt.grid(axis="y", alpha=0.3)
 plt.show()
 
 # %% FAC y FACP de la serie original
@@ -94,6 +94,7 @@ else:
 
 
 # %%
+
 ipi_serie_diff = ipi_serie.diff().dropna()
 
 # Gráfica de la serie diferenciada
@@ -102,7 +103,7 @@ plt.plot(ipi_serie_diff)
 plt.title("IPI Serie diferenciada")
 plt.xlabel("Fecha")
 plt.ylabel("Valor")
-plt.grid(True)
+plt.grid(axis="y", alpha=0.3)
 plt.show()
 
 
